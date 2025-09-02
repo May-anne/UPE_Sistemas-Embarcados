@@ -95,8 +95,38 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t frequency = 100;
+  uint32_t period_ms = 1000 / frequency; //10ms
+
+  uint32_t duty_cycle1 = 20;
+  uint32_t duty_cycle2  = 60;
+  uint32_t duty_cycle3  = 90;
+
+  uint32_t time1 = (period_ms * duty_cycle1) / 100;
+  uint32_t time2 = (period_ms * duty_cycle2) / 100;
+  uint32_t time3 = (period_ms * duty_cycle3) / 100;
+
   while (1)
   {
+
+	  HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_SET); //Forte intensidade
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET); //Média intensidade
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); //Fraca intensidade
+
+	  HAL_Delay(time1); //2ms
+
+	  HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_RESET);
+
+	  HAL_Delay(time2 - time1); //6ms - 2ms = 4ms
+
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+
+	  HAL_Delay(time3 - time2); //9ms - 6ms = 3ms
+
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+
+	  HAL_Delay(period_ms - time3); //10ms - 9ms = 1ms
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
