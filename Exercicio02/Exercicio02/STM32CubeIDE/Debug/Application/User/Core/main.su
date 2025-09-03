@@ -1,0 +1,6 @@
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:68:5:main	8	static
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:121:6:HAL_GPIO_EXTI_Callback	16	static,ignoring_inline_asm
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:135:6:SystemClock_Config	96	static
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:185:13:MX_USART2_UART_Init	8	static
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:220:13:MX_GPIO_Init	48	static
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:264:6:Error_Handler	4	static,ignoring_inline_asm

@@ -1,0 +1,6 @@
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:68:5:main	1
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:121:6:HAL_GPIO_EXTI_Callback	3
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:135:6:SystemClock_Config	4
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:185:13:MX_USART2_UART_Init	2
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:220:13:MX_GPIO_Init	1
+C:/Users/71475674473/Documents/Exercicio02/Exercicio02/Core/Src/main.c:264:6:Error_Handler	1
