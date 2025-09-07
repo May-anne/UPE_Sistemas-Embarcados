@@ -41,10 +41,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart2;
-uint32_t frequency = 1; //declaração
-uint32_t period_ms;
 
 /* USER CODE BEGIN PV */
+uint32_t frequency = 1; //declaração de variável
+uint32_t period_ms;
 
 /* USER CODE END PV */
 
