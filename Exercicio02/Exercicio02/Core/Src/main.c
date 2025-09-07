@@ -113,20 +113,6 @@ int main(void)
   /* USER CODE END 3 */
 }
 
-/*---------- FIM da MAIN ------------*/
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	if(GPIO_Pin == GPIO_PIN_13) {
-		if(frequency == 1){
-			frequency = 2;
-		}
-		else{
-			frequency = 1;
-		}
-	} else {
-		__NOP();
-	}
-}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -254,7 +240,19 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == GPIO_PIN_13) {
+		if(frequency == 1){
+			frequency = 2;
+		}
+		else{
+			frequency = 1;
+		}
+	} else {
+		__NOP();
+	}
+}
 /* USER CODE END 4 */
 
 /**
