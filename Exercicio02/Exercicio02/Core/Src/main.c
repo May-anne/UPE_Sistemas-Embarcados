@@ -114,10 +114,6 @@ int main(void)
 }
 
 /*---------- FIM da MAIN ------------*/
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_13) {
@@ -131,6 +127,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		__NOP();
 	}
 }
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 
 void SystemClock_Config(void)
 {
