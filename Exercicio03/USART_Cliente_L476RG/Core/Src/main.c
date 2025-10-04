@@ -21,7 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define TABLE_BUF_SIZE 256
+#define MAX_BLINK 5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,28 +45,49 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
-DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
+DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
+volatile bool buttonPressed = false;
+volatile bool isBusy = false;
 
+volatile uint8_t rx_byte = 0;
+volatile bool expecting_table = false;
+volatile uint8_t blink_counter = 0;
+
+volatile uint8_t dma_buffer[TABLE_BUF_SIZE];
+volatile uint16_t dma_idx = 0;
+volatile bool dma_ready = false;
+volatile uint32_t last_rx_tick = 0;
+const uint32_t table_rx_timeout = 40;
+
+uint8_t blink_done_count = 0;
+uint8_t blink_phase = 0;
+uint32_t last_toggle = 0;
+const uint32_t on_time = 200;
+const uint32_t off_time = 200;
+
+const uint32_t debounce_delay = 200;
+volatile uint32_t last_interrupt_time = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void HandleButton(void);
+static void HandleTable(void);
+static void HandleBlink(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -96,20 +120,27 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  HAL_UART_Transmit(&huart2, (uint8_t *)"USART2 OK\r\n", 11, 100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+  HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_byte, 1);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_RESET);
+
+    while(1)
+    {
+    	HandleButton();
+    	HandleTable();
+    	HandleBlink();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+    }
   /* USER CODE END 3 */
 }
 
@@ -227,7 +258,6 @@ static void MX_USART2_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
-
   /* USER CODE END USART2_Init 2 */
 
 }
@@ -302,6 +332,129 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+static void HandleButton(void) {
+    if (buttonPressed) {
+    	buttonPressed = false;
+        if (!isBusy) {
+            uint8_t cmd = 0x5A;
+            HAL_UART_Transmit_IT(&huart1, &cmd, 1);
+        }
+    }
+}
+
+static void HandleTable(void) {
+    if (expecting_table && dma_idx > 0) {
+        if (HAL_GetTick() - last_rx_tick >= table_rx_timeout) {
+        	dma_buffer[dma_idx] = '\0';
+        	dma_ready = true;
+            expecting_table = false;
+        }
+    }
+
+    if (dma_ready) {
+    	dma_ready = false;
+
+        char out[80];
+        int n = snprintf(out, sizeof(out),
+                         "Número de eventos = %u\r\n",
+                         (unsigned)blink_counter);
+
+        if (n > 0) {
+            HAL_UART_Transmit(&huart2, (uint8_t *)out,
+                              (uint16_t)strlen(out), HAL_MAX_DELAY);
+        }
+
+        if (dma_idx > 0) {
+        	dma_buffer[dma_idx] = '\0';
+            HAL_UART_Transmit(&huart2, (uint8_t *)dma_buffer,
+            			dma_idx, HAL_MAX_DELAY);
+        } else {
+            const char *empty = "Tabela vazia\r\n";
+            HAL_UART_Transmit(&huart2, (uint8_t *)empty,
+                              (uint16_t)strlen(empty), HAL_MAX_DELAY);
+        }
+
+        dma_idx = 0;
+        expecting_table = false;
+    }
+}
+
+static void HandleBlink(void) {
+    uint32_t now = HAL_GetTick();
+
+    if (blink_phase == 0 && isBusy && blink_counter > 0) {
+        blink_phase = 1;
+        blink_done_count = 0;
+        last_toggle = now;
+        HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_SET);
+    }
+
+    else if (blink_phase == 1) {
+        if (now - last_toggle >= on_time) {
+            HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_RESET);
+            last_toggle = now;
+            blink_phase = 2;
+        }
+    }
+
+    else if (blink_phase == 2) {
+        if (now - last_toggle >= off_time) {
+            blink_done_count++;
+            if (blink_done_count >= blink_counter) {
+                blink_phase = 0;
+                isBusy = false;
+                blink_counter = 0;
+                HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_RESET);
+            } else {
+                HAL_GPIO_WritePin(GPIOA, LD2_Pin, GPIO_PIN_SET);
+                last_toggle = now;
+                blink_phase = 1;
+            }
+        }
+    }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_13) {
+        uint32_t now = HAL_GetTick();
+        if (now - last_interrupt_time >= debounce_delay) {
+            if (!isBusy) {
+            	buttonPressed = true;
+            }
+        }
+        last_interrupt_time = now;
+    }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1) {
+        uint8_t b = (uint8_t)rx_byte;
+
+        if (!expecting_table) {
+            if (b > MAX_BLINK) b = MAX_BLINK;
+            blink_counter = b;
+
+            expecting_table = true;
+            dma_idx = 0;
+            dma_ready = false;
+            last_rx_tick = HAL_GetTick();
+            isBusy = true;
+        } else {
+            if (dma_idx < (TABLE_BUF_SIZE - 1)) {
+            	dma_buffer[dma_idx++] = b;
+                last_rx_tick = HAL_GetTick();
+            } else {
+            	dma_buffer[dma_idx] = '\0';
+                dma_ready = true;
+                expecting_table = false;
+            }
+        }
+
+        HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_byte, 1);
+    }
+}
 /* USER CODE END 4 */
 
 /**

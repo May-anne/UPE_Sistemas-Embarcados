@@ -21,7 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,7 +47,26 @@ DMA_HandleTypeDef hdma_usart3_rx;
 DMA_HandleTypeDef hdma_usart3_tx;
 
 /* USER CODE BEGIN PV */
+bool buttonPressed = false;
+volatile bool sendData = false;
+volatile bool isSent = false;
+volatile bool dmaWorking = false;
+volatile uint8_t buttonPressed_count = 0;
+volatile uint8_t interrupt_sent_count = 0;
 
+char tx_buffer[32];
+char rx_buffer[32];
+volatile uint8_t rx_byte = 0;
+
+volatile uint8_t current_state = 0;
+uint32_t last_interrupt_time = 0;
+const uint32_t debounce_delay = 200;
+char *tabela_equipe[] = {
+    "Mayanne, 010203",
+    "Sofia, 040506",
+    "Arthur, 070809"
+};
+char dma_buffer[128];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,13 +115,37 @@ int main(void)
   MX_DMA_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_byte, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
+  while(1)
   {
+	  if (buttonPressed) {
+		  buttonPressed = false;
+		  buttonPressed_count += 1;
+	  }
+
+	  if (sendData) {
+		  if(interrupt_sent_count==0){
+			  uint8_t times_pressed = buttonPressed_count;
+			  buttonPressed_count = 0;
+			  HAL_UART_Transmit_IT(&huart3, &times_pressed, 1);
+		  }
+		  else if(interrupt_sent_count == 1 && isSent && !dmaWorking){
+			  int len = snprintf(dma_buffer, sizeof(dma_buffer), "%s\r\n%s\r\n%s\r\n", tabela_equipe[0], tabela_equipe[1], tabela_equipe[2]);
+			  if (len > 0) {
+				dmaWorking = true;
+				isSent = false;
+				HAL_UART_Transmit_DMA(&huart3, (uint8_t *)dma_buffer, (uint16_t)len);
+			  } else {
+				  sendData = false;
+				  interrupt_sent_count = 0;
+			  }
+		  }
+	  }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -360,7 +405,45 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_0) {
+        uint32_t current_time = HAL_GetTick();
+        if (current_time - last_interrupt_time >= debounce_delay) {
+            current_state = !current_state;
+            buttonPressed = true;
+            HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, (GPIO_PinState)current_state);
+        }
+        last_interrupt_time = current_time;
+    }
+}
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART3)
+    {
+        if (dmaWorking) {
+        	dmaWorking= false;
+            isSent = true;
+            interrupt_sent_count = 0;
+            sendData = false;
+        } else {
+            isSent = true;
+            interrupt_sent_count = 1;
+        }
+    }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART3)
+  {
+    if (rx_byte == 0x5A) {
+    	sendData = true;
+    }
+    HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_byte, 1);
+  }
+}
 /* USER CODE END 4 */
 
 /**
